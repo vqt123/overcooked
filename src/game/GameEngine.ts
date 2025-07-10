@@ -1,13 +1,14 @@
 import { Player } from './Player'
 import { InputManager } from './InputManager'
 import { KitchenObject, KitchenObjectData } from './KitchenObject'
-import { Ingredient, IngredientType } from './Ingredient'
+import { Ingredient } from './Ingredient'
 import { Order } from './Order'
 import { MultiplayerManager } from './MultiplayerManager'
+import { GameRenderer } from './GameRenderer'
+import { InteractionHandler } from './InteractionHandler'
+import { GAME_CONFIG } from './GameConfig'
 
 export class GameEngine {
-  private canvas: HTMLCanvasElement
-  private ctx: CanvasRenderingContext2D
   private animationId: number | null = null
   private lastTime = 0
   private inputManager: InputManager
@@ -16,21 +17,19 @@ export class GameEngine {
   private ingredients: Ingredient[] = []
   private orders: Order[] = []
   private score: number = 0
-  private multiplayerManager: MultiplayerManager
+  private multiplayerManager!: MultiplayerManager
   private remotePlayers: Player[] = []
   private lastPlayerPosition: { x: number; y: number } = { x: 0, y: 0 }
+  private gameRenderer: GameRenderer
+  private interactionHandler: InteractionHandler
 
   constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas
-    const context = canvas.getContext('2d')
-    if (!context) {
-      throw new Error('Could not get 2D context')
-    }
-    this.ctx = context
     this.inputManager = new InputManager()
-    this.localPlayer = new Player('Player1', 400, 300, '#ff6b6b')
+    this.localPlayer = new Player('Player1', 400, 300, GAME_CONFIG.COLORS.PLAYER_COLORS[0])
+    this.gameRenderer = new GameRenderer(canvas)
     this.initializeKitchen()
     this.initializeMultiplayer()
+    this.interactionHandler = new InteractionHandler(this.multiplayerManager)
   }
 
   private initializeKitchen() {
@@ -146,139 +145,32 @@ export class GameEngine {
   }
 
   private handleInteraction() {
-    const player = this.localPlayer
-    
-    // Check interaction with kitchen objects
-    for (const obj of this.kitchenObjects) {
-      if (obj.isColliding(player.position, player.size + 20)) { // Extended range for interaction
-        
-        if (obj.data.type === 'ingredient_box' && !player.heldItem) {
-          // Pick up ingredient
-          const ingredientTypes: IngredientType[] = ['tomato', 'lettuce', 'bread', 'cheese']
-          const randomType = ingredientTypes[Math.floor(Math.random() * ingredientTypes.length)]
-          const ingredient = new Ingredient(randomType, player.position.x, player.position.y)
-          player.pickupItem(ingredient)
-          this.multiplayerManager.sendPlayerItemUpdate(ingredient)
-          break
-        }
-        
-        if (obj.data.type === 'prep_counter' && player.heldItem) {
-          // Chop ingredient
-          player.heldItem.chop()
-          this.multiplayerManager.sendPlayerItemUpdate(player.heldItem)
-          break
-        }
-        
-        if (obj.data.type === 'stove' && player.heldItem && player.heldItem.data.state === 'chopped') {
-          // Start cooking
-          player.heldItem.startCooking()
-          const ingredient = player.dropItem()!
-          ingredient.data.position = { x: obj.data.position.x + 40, y: obj.data.position.y + 20 }
-          this.ingredients.push(ingredient)
-          this.multiplayerManager.sendPlayerItemUpdate(null)
-          this.multiplayerManager.sendIngredientUpdate(this.ingredients)
-          break
-        }
-        
-        if (obj.data.type === 'stove') {
-          // Pick up cooked ingredient
-          const nearbyIngredient = this.ingredients.find(ing => 
-            Math.abs(ing.data.position.x - obj.data.position.x - 40) < 20 &&
-            Math.abs(ing.data.position.y - obj.data.position.y - 20) < 20
-          )
-          
-          if (nearbyIngredient && !player.heldItem) {
-            player.pickupItem(nearbyIngredient)
-            this.ingredients = this.ingredients.filter(ing => ing !== nearbyIngredient)
-            this.multiplayerManager.sendPlayerItemUpdate(nearbyIngredient)
-            this.multiplayerManager.sendIngredientUpdate(this.ingredients)
-            break
-          }
-        }
-        
-        if (obj.data.type === 'serving_counter' && player.heldItem) {
-          // Try to complete orders
-          this.checkOrderCompletion(player.heldItem)
-          break
-        }
-      }
-    }
-  }
+    const result = this.interactionHandler.handlePlayerInteraction(
+      this.localPlayer,
+      this.kitchenObjects,
+      this.ingredients,
+      this.orders
+    )
 
-  private checkOrderCompletion(deliveredItem: Ingredient) {
-    for (let i = 0; i < this.orders.length; i++) {
-      const order = this.orders[i]
-      
-      // For simple single-item orders
-      if (order.data.items.length === 1) {
-        const requiredItem = order.data.items[0]
-        if (deliveredItem.data.type === requiredItem.type && 
-            deliveredItem.data.state === requiredItem.state) {
-          
-          // Order completed! Send to server for processing
-          this.localPlayer.dropItem() // Remove the delivered item
-          this.multiplayerManager.sendPlayerItemUpdate(null)
-          // Send order completion to server
-          this.multiplayerManager.sendOrderCompletion(order.data.id, order.data.points)
-          break
-        }
-      }
+    // Handle any state changes from interactions
+    if (result.ingredientsUpdated) {
+      // Ingredients were updated, no additional action needed
+    }
+
+    if (result.orderCompleted && result.completedOrder) {
+      // Order was completed, will be handled by server
     }
   }
 
   private render() {
-    // Clear canvas
-    this.ctx.fillStyle = '#4a5568'
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
-
-    // Draw kitchen floor tiles
-    this.drawKitchenFloor()
-    
-    // Draw kitchen objects
-    this.kitchenObjects.forEach(obj => obj.draw(this.ctx))
-    
-    // Draw ingredients on counters/stoves
-    this.ingredients.forEach(ingredient => ingredient.draw(this.ctx))
-    
-    // Draw local player
-    this.localPlayer.draw(this.ctx)
-    
-    // Draw remote players
-    this.remotePlayers.forEach(player => player.draw(this.ctx))
-    
-    // Draw UI
-    this.drawUI()
-  }
-
-  private drawKitchenFloor() {
-    const tileSize = 32
-    this.ctx.fillStyle = '#2d3748'
-    
-    for (let x = 0; x < this.canvas.width; x += tileSize) {
-      for (let y = 0; y < this.canvas.height; y += tileSize) {
-        if ((x / tileSize + y / tileSize) % 2 === 0) {
-          this.ctx.fillRect(x, y, tileSize, tileSize)
-        }
-      }
-    }
-  }
-
-  private drawUI() {
-    // Draw score
-    this.ctx.fillStyle = 'white'
-    this.ctx.font = '20px Arial'
-    this.ctx.textAlign = 'right'
-    this.ctx.fillText(`Score: ${this.score}`, this.canvas.width - 20, 30)
-    
-    // Draw orders
-    this.orders.forEach((order, index) => {
-      order.draw(this.ctx, this.canvas.width - 220, 50 + (index * 90))
-    })
-    
-    // Draw instructions at bottom
-    this.ctx.font = '12px Arial'
-    this.ctx.textAlign = 'left'
-    this.ctx.fillText('WASD: Move | SPACE: Interact | Yellow counter: Serve orders', 10, this.canvas.height - 20)
+    this.gameRenderer.render(
+      this.kitchenObjects,
+      this.ingredients,
+      this.localPlayer,
+      this.remotePlayers,
+      this.orders,
+      this.score
+    )
   }
 
 }
