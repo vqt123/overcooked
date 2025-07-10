@@ -3,6 +3,7 @@ import { InputManager } from './InputManager'
 import { KitchenObject, KitchenObjectData } from './KitchenObject'
 import { Ingredient } from './Ingredient'
 import { Order } from './Order'
+import { Plate } from './Plate'
 import { MultiplayerManager } from './MultiplayerManager'
 import { GameRenderer } from './GameRenderer'
 import { InteractionHandler } from './InteractionHandler'
@@ -15,6 +16,7 @@ export class GameEngine {
   private localPlayer: Player
   private kitchenObjects: KitchenObject[] = []
   private ingredients: Ingredient[] = []
+  private plates: Plate[] = []
   private orders: Order[] = []
   private score: number = 0
   private multiplayerManager!: MultiplayerManager
@@ -22,6 +24,9 @@ export class GameEngine {
   private lastPlayerPosition: { x: number; y: number } = { x: 0, y: 0 }
   private gameRenderer: GameRenderer
   private interactionHandler: InteractionHandler
+  private lastInteractionTime = 0
+  private lastDropTime = 0
+  private inputCooldown = 300 // 300ms cooldown between interactions
 
   constructor(canvas: HTMLCanvasElement) {
     this.inputManager = new InputManager()
@@ -56,10 +61,38 @@ export class GameEngine {
         interactable: true
       },
       {
-        id: 'ingredients1',
-        type: 'ingredient_box',
+        id: 'tomato_box',
+        type: 'tomato_box',
         position: { x: 50, y: 200 },
-        size: { width: 60, height: 60 },
+        size: { width: 50, height: 50 },
+        interactable: true
+      },
+      {
+        id: 'lettuce_box',
+        type: 'lettuce_box',
+        position: { x: 110, y: 200 },
+        size: { width: 50, height: 50 },
+        interactable: true
+      },
+      {
+        id: 'bread_box',
+        type: 'bread_box',
+        position: { x: 170, y: 200 },
+        size: { width: 50, height: 50 },
+        interactable: true
+      },
+      {
+        id: 'cheese_box',
+        type: 'cheese_box',
+        position: { x: 230, y: 200 },
+        size: { width: 50, height: 50 },
+        interactable: true
+      },
+      {
+        id: 'plates1',
+        type: 'plate_stack',
+        position: { x: 400, y: 100 },
+        size: { width: 60, height: 40 },
         interactable: true
       }
     ]
@@ -114,13 +147,13 @@ export class GameEngine {
     const deltaTime = currentTime - this.lastTime
     this.lastTime = currentTime
 
-    this.update(deltaTime)
+    this.update(deltaTime, currentTime)
     this.render()
 
     this.animationId = requestAnimationFrame(this.gameLoop)
   }
 
-  private update(deltaTime: number) {
+  private update(deltaTime: number, currentTime: number) {
     const input = this.inputManager.getKeys()
     this.localPlayer.update(deltaTime, input)
     
@@ -138,9 +171,16 @@ export class GameEngine {
       this.lastPlayerPosition = { ...this.localPlayer.position }
     }
     
-    // Handle interactions
-    if (input[' ']) { // Spacebar for interactions
+    // Handle interactions with cooldown to prevent bouncing
+    if (input[' '] && currentTime - this.lastInteractionTime > this.inputCooldown) {
       this.handleInteraction()
+      this.lastInteractionTime = currentTime
+    }
+    
+    // Handle item dropping with 'Q' key
+    if ((input['q'] || input['Q']) && currentTime - this.lastDropTime > this.inputCooldown) {
+      this.handleItemDrop()
+      this.lastDropTime = currentTime
     }
   }
 
@@ -149,6 +189,7 @@ export class GameEngine {
       this.localPlayer,
       this.kitchenObjects,
       this.ingredients,
+      this.plates,
       this.orders
     )
 
@@ -162,10 +203,40 @@ export class GameEngine {
     }
   }
 
+  private handleItemDrop() {
+    if (this.localPlayer.heldItem) {
+      // Drop the item at player's position
+      const droppedItem = this.localPlayer.dropItem()
+      
+      // If it's an ingredient, add it to the ingredients list
+      if (droppedItem instanceof Ingredient) {
+        droppedItem.data.position = { 
+          x: this.localPlayer.position.x + 30, 
+          y: this.localPlayer.position.y 
+        }
+        this.ingredients.push(droppedItem)
+        this.multiplayerManager.sendIngredientUpdate(this.ingredients)
+      }
+      
+      // If it's a plate, add it to the plates list
+      if (droppedItem instanceof Plate) {
+        droppedItem.position = { 
+          x: this.localPlayer.position.x + 30, 
+          y: this.localPlayer.position.y 
+        }
+        this.plates.push(droppedItem)
+        // TODO: Send plate update to multiplayer
+      }
+      
+      this.multiplayerManager.sendPlayerItemUpdate(null)
+    }
+  }
+
   private render() {
     this.gameRenderer.render(
       this.kitchenObjects,
       this.ingredients,
+      this.plates,
       this.localPlayer,
       this.remotePlayers,
       this.orders,

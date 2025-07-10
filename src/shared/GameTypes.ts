@@ -1,6 +1,6 @@
 export type IngredientType = 'tomato' | 'lettuce' | 'bread' | 'cheese'
 export type IngredientState = 'raw' | 'chopped' | 'cooked' | 'burnt'
-export type KitchenObjectType = 'stove' | 'prep_counter' | 'serving_counter' | 'ingredient_box'
+export type KitchenObjectType = 'stove' | 'prep_counter' | 'serving_counter' | 'ingredient_box' | 'plate_stack' | 'tomato_box' | 'lettuce_box' | 'bread_box' | 'cheese_box'
 
 export interface Position {
   x: number

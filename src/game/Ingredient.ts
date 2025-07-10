@@ -1,3 +1,5 @@
+import { GAME_CONFIG } from './GameConfig'
+
 export type IngredientType = 'tomato' | 'lettuce' | 'bread' | 'cheese'
 export type IngredientState = 'raw' | 'chopped' | 'cooked' | 'burnt'
 
@@ -10,7 +12,7 @@ export interface IngredientData {
 
 export class Ingredient {
   public data: IngredientData
-  private maxCookingTime = 5000 // 5 seconds
+  private maxCookingTime = GAME_CONFIG.COOKING.MAX_TIME
 
   constructor(type: IngredientType, x: number, y: number) {
     this.data = {

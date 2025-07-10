@@ -1,6 +1,7 @@
-import { Player } from './Player'
+import { Player, HeldItem } from './Player'
 import { KitchenObject } from './KitchenObject'
 import { Ingredient, IngredientType } from './Ingredient'
+import { Plate } from './Plate'
 import { Order } from './Order'
 import { MultiplayerManager } from './MultiplayerManager'
 import { GAME_CONFIG } from './GameConfig'
@@ -12,6 +13,7 @@ export class InteractionHandler {
     player: Player,
     kitchenObjects: KitchenObject[],
     ingredients: Ingredient[],
+    plates: Plate[],
     orders: Order[]
   ): {
     ingredientsUpdated: boolean
@@ -24,6 +26,10 @@ export class InteractionHandler {
 
     for (const kitchenObject of kitchenObjects) {
       if (this.isInInteractionRange(player, kitchenObject)) {
+        
+        if (this.handlePlatePickup(player, kitchenObject)) {
+          break
+        }
         
         if (this.handleIngredientPickup(player, kitchenObject)) {
           break
@@ -40,6 +46,10 @@ export class InteractionHandler {
         
         if (this.handleCookedIngredientPickup(player, kitchenObject, ingredients)) {
           ingredientsUpdated = true
+          break
+        }
+        
+        if (this.handleIngredientToPlate(player, kitchenObject, plates)) {
           break
         }
         
@@ -63,20 +73,43 @@ export class InteractionHandler {
   }
 
   private handleIngredientPickup(player: Player, kitchenObject: KitchenObject): boolean {
-    if (kitchenObject.data.type === 'ingredient_box' && !player.heldItem) {
-      const ingredientTypes: IngredientType[] = ['tomato', 'lettuce', 'bread', 'cheese']
-      const randomType = ingredientTypes[Math.floor(Math.random() * ingredientTypes.length)]
-      const ingredient = new Ingredient(randomType, player.position.x, player.position.y)
+    if (!player.heldItem) {
+      let ingredientType: IngredientType | null = null
       
-      player.pickupItem(ingredient)
-      this.multiplayerManager.sendPlayerItemUpdate(ingredient)
-      return true
+      switch (kitchenObject.data.type) {
+        case 'ingredient_box':
+          // Random ingredient from the general box
+          const ingredientTypes: IngredientType[] = ['tomato', 'lettuce', 'bread', 'cheese']
+          ingredientType = ingredientTypes[Math.floor(Math.random() * ingredientTypes.length)]
+          break
+        case 'tomato_box':
+          ingredientType = 'tomato'
+          break
+        case 'lettuce_box':
+          ingredientType = 'lettuce'
+          break
+        case 'bread_box':
+          ingredientType = 'bread'
+          break
+        case 'cheese_box':
+          ingredientType = 'cheese'
+          break
+      }
+      
+      if (ingredientType) {
+        const ingredient = new Ingredient(ingredientType, player.position.x, player.position.y)
+        player.pickupItem(ingredient)
+        this.multiplayerManager.sendPlayerItemUpdate(ingredient)
+        return true
+      }
     }
     return false
   }
 
   private handleIngredientChopping(player: Player, kitchenObject: KitchenObject): boolean {
-    if (kitchenObject.data.type === 'prep_counter' && player.heldItem) {
+    if (kitchenObject.data.type === 'prep_counter' && 
+        player.heldItem && 
+        player.heldItem instanceof Ingredient) {
       player.heldItem.chop()
       this.multiplayerManager.sendPlayerItemUpdate(player.heldItem)
       return true
@@ -91,10 +124,11 @@ export class InteractionHandler {
   ): boolean {
     if (kitchenObject.data.type === 'stove' && 
         player.heldItem && 
+        player.heldItem instanceof Ingredient &&
         player.heldItem.data.state === 'chopped') {
       
       player.heldItem.startCooking()
-      const ingredient = player.dropItem()!
+      const ingredient = player.dropItem() as Ingredient
       ingredient.data.position = { 
         x: kitchenObject.data.position.x + 40, 
         y: kitchenObject.data.position.y + 20 
@@ -154,12 +188,42 @@ export class InteractionHandler {
     )
   }
 
-  private checkOrderCompletion(deliveredItem: Ingredient, order: Order): boolean {
-    if (order.data.items.length === 1) {
+  private handlePlatePickup(player: Player, kitchenObject: KitchenObject): boolean {
+    if (kitchenObject.data.type === 'plate_stack' && !player.heldItem) {
+      const plate = new Plate(player.position.x, player.position.y)
+      player.pickupItem(plate)
+      this.multiplayerManager.sendPlayerItemUpdate(null) // TODO: Handle plate updates
+      return true
+    }
+    return false
+  }
+
+  private handleIngredientToPlate(player: Player, kitchenObject: KitchenObject, _plates: Plate[]): boolean {
+    // If player has a plate and there's an ingredient, add it to the plate
+    if (kitchenObject.data.type === 'prep_counter' && 
+        player.heldItem && 
+        player.heldItem instanceof Plate) {
+      
+      // For now, just return false - we'll implement ingredient-to-plate logic later
+      // The current logic creates infinite plate creation loops
+      return false
+    }
+    return false
+  }
+
+  private checkOrderCompletion(deliveredItem: HeldItem, order: Order): boolean {
+    // For now, only support single ingredient orders to fix the stuck issue
+    if (deliveredItem instanceof Ingredient && order.data.items.length === 1) {
       const requiredItem = order.data.items[0]
       return deliveredItem.data.type === requiredItem.type && 
              deliveredItem.data.state === requiredItem.state
     }
+    
+    // TODO: Re-implement plate-based orders later
+    // if (deliveredItem instanceof Plate) {
+    //   // Plate logic here
+    // }
+    
     return false
   }
 }

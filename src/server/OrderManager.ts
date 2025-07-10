@@ -1,4 +1,5 @@
 import { Server } from 'socket.io'
+import { GAME_CONFIG } from '../game/GameConfig'
 
 export interface OrderData {
   id: string
@@ -14,7 +15,7 @@ export interface Order {
 
 export class OrderManager {
   private orderIdCounter = 1
-  private nextOrderTime = 5000 // First order in 5 seconds
+  private nextOrderTime = GAME_CONFIG.ORDERS.FIRST_ORDER_DELAY
   private orders: Order[] = []
   private score = 0
   private io: Server
@@ -59,22 +60,23 @@ export class OrderManager {
 
   private generateOrder(): Order {
     const orderTypes = [
-      // Simple orders
+      // Simple orders only (until plate system is fixed)
       [{ type: 'tomato', state: 'chopped' }],
       [{ type: 'lettuce', state: 'chopped' }],
       [{ type: 'bread', state: 'cooked' }],
+      [{ type: 'cheese', state: 'cooked' }],
       
-      // Complex orders (burgers)
-      [
-        { type: 'bread', state: 'cooked' },
-        { type: 'tomato', state: 'chopped' },
-        { type: 'lettuce', state: 'chopped' }
-      ],
-      [
-        { type: 'bread', state: 'cooked' },
-        { type: 'cheese', state: 'cooked' },
-        { type: 'tomato', state: 'chopped' }
-      ]
+      // TODO: Re-enable complex orders when plate system works
+      // [
+      //   { type: 'bread', state: 'cooked' },
+      //   { type: 'tomato', state: 'chopped' },
+      //   { type: 'lettuce', state: 'chopped' }
+      // ],
+      // [
+      //   { type: 'bread', state: 'cooked' },
+      //   { type: 'cheese', state: 'cooked' },
+      //   { type: 'tomato', state: 'chopped' }
+      // ]
     ]
 
     const selectedOrder = orderTypes[Math.floor(Math.random() * orderTypes.length)]
@@ -83,9 +85,9 @@ export class OrderManager {
       data: {
         id: `#${this.orderIdCounter++}`,
         items: selectedOrder,
-        timeRemaining: 30000, // 30 seconds
-        maxTime: 30000,
-        points: 100
+        timeRemaining: GAME_CONFIG.ORDERS.BASE_TIME,
+        maxTime: GAME_CONFIG.ORDERS.BASE_TIME,
+        points: GAME_CONFIG.ORDERS.BASE_POINTS
       }
     }
   }
@@ -94,10 +96,10 @@ export class OrderManager {
     this.gameLoopInterval = setInterval(() => {
       this.nextOrderTime -= 1000 // 1 second intervals
       
-      if (this.nextOrderTime <= 0 && this.orders.length < 3) {
+      if (this.nextOrderTime <= 0 && this.orders.length < GAME_CONFIG.ORDERS.MAX_ORDERS) {
         const newOrder = this.generateOrder()
         this.orders.push(newOrder)
-        this.nextOrderTime = 15000 + Math.random() * 10000 // 15-25 seconds
+        this.nextOrderTime = GAME_CONFIG.ORDERS.MIN_INTERVAL + Math.random() * (GAME_CONFIG.ORDERS.MAX_INTERVAL - GAME_CONFIG.ORDERS.MIN_INTERVAL)
         
         console.log(`Generated new order: ${newOrder.data.id}`)
         
@@ -111,7 +113,7 @@ export class OrderManager {
         
         // Reduce points as time passes
         const timeRatio = order.data.timeRemaining / order.data.maxTime
-        order.data.points = Math.max(10, Math.floor(100 * timeRatio))
+        order.data.points = Math.max(GAME_CONFIG.ORDERS.MIN_POINTS, Math.floor(GAME_CONFIG.ORDERS.BASE_POINTS * timeRatio))
         
         if (order.data.timeRemaining <= 0) {
           // Order expired - lose points

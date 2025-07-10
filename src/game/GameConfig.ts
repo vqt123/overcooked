@@ -9,15 +9,15 @@ export const GAME_CONFIG = {
     INTERACTION_RANGE: 20,
   },
   COOKING: {
-    MAX_TIME: 5000,
+    MAX_TIME: 20000,    // 5s -> 20s (cooking time)
     BURN_MULTIPLIER: 1.5,
   },
   ORDERS: {
     MAX_ORDERS: 3,
-    FIRST_ORDER_DELAY: 5000,
-    MIN_INTERVAL: 15000,
-    MAX_INTERVAL: 25000,
-    BASE_TIME: 30000,
+    FIRST_ORDER_DELAY: 20000,    // 5s -> 20s
+    MIN_INTERVAL: 60000,         // 15s -> 60s  
+    MAX_INTERVAL: 100000,        // 25s -> 100s
+    BASE_TIME: 120000,           // 30s -> 120s (2 minutes per order)
     BASE_POINTS: 100,
     MIN_POINTS: 10,
   },
@@ -28,12 +28,17 @@ export const GAME_CONFIG = {
       PREP_COUNTER: '#c0c0c0',
       SERVING_COUNTER: '#ffd700',
       INGREDIENT_BOX: '#90ee90',
+      PLATE_STACK: '#dcdcdc',
+      TOMATO_BOX: '#ff6b6b',
+      LETTUCE_BOX: '#66ff66',
+      BREAD_BOX: '#f5deb3',
+      CHEESE_BOX: '#fff8dc',
     },
     FLOOR: {
       PRIMARY: '#4a5568',
       SECONDARY: '#2d3748',
     },
   },
-} as const
+}
 
 export type GameConfig = typeof GAME_CONFIG

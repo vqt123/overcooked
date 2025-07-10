@@ -1,6 +1,8 @@
+import { GAME_CONFIG } from './GameConfig'
+
 export interface KitchenObjectData {
   id: string
-  type: 'stove' | 'prep_counter' | 'serving_counter' | 'ingredient_box'
+  type: 'stove' | 'prep_counter' | 'serving_counter' | 'ingredient_box' | 'plate_stack' | 'tomato_box' | 'lettuce_box' | 'bread_box' | 'cheese_box'
   position: { x: number; y: number }
   size: { width: number; height: number }
   interactable: boolean
@@ -19,16 +21,31 @@ export class KitchenObject {
     // Set color based on type
     switch (type) {
       case 'stove':
-        ctx.fillStyle = '#8b4513'
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.STOVE
         break
       case 'prep_counter':
-        ctx.fillStyle = '#c0c0c0'
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.PREP_COUNTER
         break
       case 'serving_counter':
-        ctx.fillStyle = '#ffd700'
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.SERVING_COUNTER
         break
       case 'ingredient_box':
-        ctx.fillStyle = '#90ee90'
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.INGREDIENT_BOX
+        break
+      case 'plate_stack':
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.PLATE_STACK
+        break
+      case 'tomato_box':
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.TOMATO_BOX
+        break
+      case 'lettuce_box':
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.LETTUCE_BOX
+        break
+      case 'bread_box':
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.BREAD_BOX
+        break
+      case 'cheese_box':
+        ctx.fillStyle = GAME_CONFIG.COLORS.KITCHEN.CHEESE_BOX
         break
     }
 
@@ -60,6 +77,21 @@ export class KitchenObject {
         break
       case 'ingredient_box':
         ctx.fillText('Ingredients', centerX, centerY)
+        break
+      case 'plate_stack':
+        ctx.fillText('Plates', centerX, centerY)
+        break
+      case 'tomato_box':
+        ctx.fillText('Tomato', centerX, centerY)
+        break
+      case 'lettuce_box':
+        ctx.fillText('Lettuce', centerX, centerY)
+        break
+      case 'bread_box':
+        ctx.fillText('Bread', centerX, centerY)
+        break
+      case 'cheese_box':
+        ctx.fillText('Cheese', centerX, centerY)
         break
     }
   }

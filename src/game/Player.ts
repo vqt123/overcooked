@@ -1,9 +1,12 @@
 import { Ingredient } from './Ingredient'
+import { Plate } from './Plate'
 
 export interface Position {
   x: number
   y: number
 }
+
+export type HeldItem = Ingredient | Plate | null
 
 export class Player {
   public position: Position
@@ -11,7 +14,7 @@ export class Player {
   public speed: number = 150
   public color: string
   public id: string
-  public heldItem: Ingredient | null = null
+  public heldItem: HeldItem = null
 
   constructor(id: string, x: number, y: number, color: string) {
     this.id = id
@@ -64,20 +67,32 @@ export class Player {
 
     // Draw held item
     if (this.heldItem) {
-      this.heldItem.data.position = { x: this.position.x, y: this.position.y - 30 }
-      this.heldItem.draw(ctx)
+      if (this.heldItem instanceof Ingredient) {
+        this.heldItem.data.position = { x: this.position.x, y: this.position.y - 30 }
+        this.heldItem.draw(ctx)
+      } else if (this.heldItem instanceof Plate) {
+        this.heldItem.position = { x: this.position.x, y: this.position.y - 30 }
+        this.heldItem.draw(ctx)
+      }
     }
   }
 
-  pickupItem(item: Ingredient) {
+  pickupItem(item: HeldItem) {
     if (!this.heldItem) {
       this.heldItem = item
     }
   }
 
-  dropItem(): Ingredient | null {
+  dropItem(): HeldItem {
     const item = this.heldItem
     this.heldItem = null
     return item
+  }
+
+  isHolding(itemType: 'ingredient' | 'plate'): boolean {
+    if (!this.heldItem) return false
+    if (itemType === 'ingredient') return this.heldItem instanceof Ingredient
+    if (itemType === 'plate') return this.heldItem instanceof Plate
+    return false
   }
 }
